@@ -1,0 +1,36 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: barichello/godot-ci:4.3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Android setup
+        run: |
+          mkdir -p build .godot/editor .godot/imported
+          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore /root/ci-debug.keystore -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
+          JDK="$(dirname $(dirname $(readlink -f $(which javac))))"
+          echo "JAVA_HOME=$JDK" >> $GITHUB_ENV
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=/root/ci-debug.keystore" >> $GITHUB_ENV
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> $GITHUB_ENV
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> $GITHUB_ENV
+          echo "JDK=$JDK ANDROID_HOME=$ANDROID_HOME"
+          ls -la /root/.config/godot || true
+
+      - name: Import project
+        run: HOME=/root godot --headless --import || true
+
+      - name: Export APK
+        run: HOME=/root godot --headless --export-debug "Android" build/zombie30.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zombie30-apk
+          path: build/zombie30.apk
